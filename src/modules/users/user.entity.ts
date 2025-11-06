@@ -20,6 +20,16 @@ export class User {
   @Column({ name: 'hash_password' })
   hashPassword: string;
 
+  @Column({ name: 'reset_password_token', nullable: true })
+  resetPasswordToken?: string | null;
+
+  @Column({
+    name: 'reset_password_expires_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  resetPasswordExpiresAt?: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

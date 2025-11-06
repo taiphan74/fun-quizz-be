@@ -5,6 +5,8 @@ import { User } from './user.entity';
 export class CreateUserDto extends OmitType(User, [
   'id',
   'hashPassword',
+  'resetPasswordToken',
+  'resetPasswordExpiresAt',
   'createdAt',
   'updatedAt',
   'deletedAt',
@@ -23,5 +25,7 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
 
 export class UserResponseDto extends OmitType(User, [
   'hashPassword',
+  'resetPasswordToken',
+  'resetPasswordExpiresAt',
   'deletedAt',
 ] as const) {}

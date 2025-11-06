@@ -46,7 +46,13 @@ export class UsersService {
   }
 
   private toResponse(user: User): UserResponseDto {
-    const { hashPassword, deletedAt, ...response } = user;
+    const {
+      hashPassword,
+      deletedAt,
+      resetPasswordToken,
+      resetPasswordExpiresAt,
+      ...response
+    } = user;
     return response as UserResponseDto;
   }
 }
