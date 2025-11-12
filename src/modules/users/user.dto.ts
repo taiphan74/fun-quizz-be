@@ -1,12 +1,11 @@
-import { ApiProperty, PartialType, OmitType } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, MinLength, IsOptional } from 'class-validator';
+import { ApiProperty, OmitType, PartialType } from '@nestjs/swagger';
+import { Exclude, Expose } from 'class-transformer';
+import { IsNotEmpty, IsOptional, MinLength } from 'class-validator';
 import { User } from './user.entity';
 
 export class CreateUserDto extends OmitType(User, [
   'id',
   'hashPassword',
-  'resetPasswordToken',
-  'resetPasswordExpiresAt',
   'createdAt',
   'updatedAt',
   'deletedAt',
@@ -23,9 +22,26 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   password?: string;
 }
 
-export class UserResponseDto extends OmitType(User, [
-  'hashPassword',
-  'resetPasswordToken',
-  'resetPasswordExpiresAt',
-  'deletedAt',
-] as const) {}
+@Exclude()
+export class UserResponseDto {
+  @Expose()
+  id: string;
+
+  @Expose()
+  firstName: string;
+
+  @Expose()
+  lastName: string;
+
+  @Expose()
+  username: string;
+
+  @Expose()
+  email: string;
+
+  @Expose()
+  createdAt: Date;
+
+  @Expose()
+  updatedAt: Date;
+}

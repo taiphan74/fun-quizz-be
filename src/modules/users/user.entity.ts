@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+} from 'typeorm';
+import { Exclude } from 'class-transformer';
 
 @Entity('users')
 export class User {
@@ -17,18 +25,10 @@ export class User {
   @Column({ unique: true })
   email: string;
 
+  @Column({ select: false })
+  @Exclude()
   @Column({ name: 'hash_password' })
   hashPassword: string;
-
-  @Column({ name: 'reset_password_token', nullable: true })
-  resetPasswordToken?: string | null;
-
-  @Column({
-    name: 'reset_password_expires_at',
-    type: 'timestamptz',
-    nullable: true,
-  })
-  resetPasswordExpiresAt?: Date | null;
 
   @CreateDateColumn()
   createdAt: Date;

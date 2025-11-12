@@ -17,26 +17,3 @@ export class LoginDto {
 }
 
 export class RegisterDto extends CreateUserDto {}
-
-export class ForgotPasswordDto {
-  @ApiProperty({
-    description: 'Username or email of the account to reset',
-    example: 'johndoe',
-  })
-  @IsNotEmpty()
-  usernameOrEmail: string;
-}
-
-export class ResetPasswordDto {
-  @ApiProperty({
-    description: 'Reset token previously issued using forgot password flow',
-    example: 'b9e8f5a2008446eaa825b7a7f79269fa',
-  })
-  @IsNotEmpty()
-  token: string;
-
-  @ApiProperty({ example: 'newSecret123', minLength: 6 })
-  @IsNotEmpty()
-  @MinLength(6)
-  newPassword: string;
-}

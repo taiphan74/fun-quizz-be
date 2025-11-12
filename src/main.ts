@@ -1,4 +1,5 @@
-import { NestFactory } from '@nestjs/core';
+import { ClassSerializerInterceptor } from '@nestjs/common';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
@@ -6,9 +7,13 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const reflector = app.get(Reflector);
 
   app.use(helmet());
-  app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useGlobalInterceptors(
+    new ClassSerializerInterceptor(reflector),
+    new ResponseInterceptor(),
+  );
 
   if (process.env.NODE_ENV === 'development') {
     const config = new DocumentBuilder()
@@ -23,4 +28,5 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3000);
   console.log(`🚀 Server running on port ${process.env.PORT ?? 3000}`);
 }
-bootstrap();
+
+void bootstrap();

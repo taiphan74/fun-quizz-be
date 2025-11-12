@@ -31,6 +31,23 @@
 $ npm install
 ```
 
+## Environment variables
+
+The application reads its database and Redis configuration from environment variables. Duplicate `.env.example` into `.env` and adjust as needed.
+
+- `REDIS_HOST` (default `localhost`)
+- `REDIS_PORT` (default `6379`)
+- `REDIS_USERNAME`, `REDIS_PASSWORD` (optional)
+- `REDIS_DB` (default `0`)
+
+## Docker Compose
+
+Use docker-compose to provision both PostgreSQL and Redis locally:
+
+```bash
+docker compose up -d postgres redis
+```
+
 ## Compile and run the project
 
 ```bash
