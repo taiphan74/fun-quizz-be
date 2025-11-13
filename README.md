@@ -1,115 +1,128 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Fun Quizz - Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS (v11) API phục vụ cho nền tảng Fun Quizz: quản lý người dùng, xác thực JWT và các dịch vụ nền tảng như PostgreSQL, Redis. Tất cả được viết bằng TypeScript, sẵn sàng mở rộng thêm module quiz trong các sprint tiếp theo.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Giới thiệu
 
-## Description
+- NestJS + TypeORM kết nối PostgreSQL, bật `synchronize` để tự tạo schema trong môi trường phát triển.
+- Redis được đóng gói qua `RedisModule` dùng `ioredis`, sẵn cho cache hoặc hàng đợi sự kiện.
+- Module `auth` chịu trách nhiệm đăng ký/đăng nhập, cấp JWT theo chuẩn Bearer.
+- Module `users` cung cấp CRUD, bảo vệ bằng `JwtAuthGuard`.
+- Lớp `ResponseInterceptor` chuẩn hóa mọi phản hồi về một định dạng thống nhất (`statusCode`, `message`, `timestamp`, `data`).
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Công nghệ chính
 
-## Project setup
+- Node.js 20+, NestJS 11, TypeScript 5.7.
+- TypeORM + PostgreSQL cho tầng dữ liệu.
+- Passport + @nestjs/jwt cho bảo mật phiên.
+- Redis 7 (thông qua `ioredis`) cho cache hoặc rate-limit.
+- Swagger/OpenAPI tự động bật ở `/api` khi `NODE_ENV=development`.
 
-```bash
-$ npm install
-```
+## Yêu cầu hệ thống
 
-## Environment variables
+- Node.js >= 20 và npm >= 10.
+- Docker (tùy chọn) nếu muốn chạy PostgreSQL/Redis qua `docker compose`.
+- PostgreSQL và Redis cục bộ nếu không dùng Docker.
 
-The application reads its database and Redis configuration from environment variables. Duplicate `.env.example` into `.env` and adjust as needed.
+## Thiết lập môi trường
 
-- `REDIS_HOST` (default `localhost`)
-- `REDIS_PORT` (default `6379`)
-- `REDIS_USERNAME`, `REDIS_PASSWORD` (optional)
-- `REDIS_DB` (default `0`)
+1. Cài đặt phụ thuộc:
 
-## Docker Compose
+   ```bash
+   npm install
+   ```
 
-Use docker-compose to provision both PostgreSQL and Redis locally:
+2. Tạo file `.env` ở thư mục gốc (tham khảo ví dụ bên dưới) hoặc inject qua biến môi trường của hệ điều hành:
+
+   ```dotenv
+   NODE_ENV=development
+   PORT=3000
+
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_USER=fun-quizz
+   DB_PASSWORD=fun-quizz
+   DB_NAME=fun-quizz
+
+   REDIS_HOST=localhost
+   REDIS_PORT=6379
+   REDIS_DB=0
+
+   JWT_SECRET=super-secret-change-me
+   JWT_EXPIRES_IN=3600
+   ```
+
+## Sử dụng Docker
+
+Dự án cung cấp `docker-compose.yml` để dựng nhanh PostgreSQL và Redis:
 
 ```bash
 docker compose up -d postgres redis
 ```
 
-## Compile and run the project
+Các service sẽ lắng nghe ở `5432` và `6379` tương ứng, dữ liệu được lưu trong volume `postgres_data`/`redis_data`.
 
-```bash
-# development
-$ npm run start
+## Chạy ứng dụng
 
-# watch mode
-$ npm run start:dev
+| Lệnh              | Mô tả                                   |
+| ----------------- | ---------------------------------------- |
+| `npm run start`   | chạy chế độ production (biên dịch sẵn).  |
+| `npm run start:dev` | hot-reload phục vụ phát triển.        |
+| `npm run start:prod` | chạy kết quả build trong `dist`.     |
 
-# production mode
-$ npm run start:prod
+Sau khi khởi chạy, API mặc định ở `http://localhost:3000`. Khi đang ở `development`, truy cập `http://localhost:3000/api` để xem tài liệu Swagger và thử nhanh các endpoint `auth`, `users`.
+
+## Cấu trúc thư mục
+
+```
+src
+├── common
+│   ├── interceptors/response.interceptor.ts  # Chuẩn hóa response
+│   └── redis                                 # Định nghĩa Redis client dạng Global module
+├── modules
+│   ├── auth                                  # Đăng nhập, đăng ký, JWT guard/strategy
+│   └── users                                 # DTO, entity, mapper, service & controller
+├── app.module.ts                             # Khởi tạo ConfigModule, TypeORM, Redis
+└── main.ts                                   # Bootstrap app, bật Helmet, CORS, Swagger
 ```
 
-## Run tests
+## Bảo mật & chuẩn API
 
-```bash
-# unit tests
-$ npm run test
+- Tất cả route `users/*` đều required Bearer token hợp lệ (JWT do `auth/login` cấp).
+- Mật khẩu người dùng được băm bằng `bcryptjs` và ẩn khỏi phản hồi thông qua `ClassSerializerInterceptor`.
+- Mọi response đều có dạng:
 
-# e2e tests
-$ npm run test:e2e
+  ```json
+  {
+    "statusCode": 200,
+    "message": "Success",
+    "timestamp": "2025-01-01T00:00:00.000Z",
+    "data": { "...payload" }
+  }
+  ```
 
-# test coverage
-$ npm run test:cov
-```
+Điều này giúp frontend chỉ cần xử lý một contract duy nhất.
 
-## Deployment
+## Kiểm thử & chất lượng mã
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+| Lệnh              | Công dụng                                       |
+| ----------------- | ------------------------------------------------ |
+| `npm run test`    | unit test với Jest.                             |
+| `npm run test:e2e`| end-to-end test (cấu hình tại `test/jest-e2e.json`). |
+| `npm run test:cov`| báo cáo coverage.                               |
+| `npm run lint`    | eslint + prettier để đảm bảo coding-style.      |
+| `npm run format`  | format toàn bộ `src` và `test`.                 |
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Khuyến nghị chạy `npm run lint && npm run test` trước khi mở PR.
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+## Ghi chú triển khai
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+- `TypeOrmModule` đang bật `synchronize: true`; hãy tắt và dùng migration khi lên môi trường production.
+- Thiết lập biến `JWT_SECRET` đủ mạnh và `JWT_EXPIRES_IN` phù hợp (giây).
+- Dùng reverse proxy (Nginx, Cloudflare, ...) để bật HTTPS và rate-limit khi triển khai thực tế.
 
-## Resources
+## Định hướng mở rộng
 
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- Thêm module quiz (câu hỏi, phòng chơi, bảng xếp hạng) dựa trên cấu trúc module hiện hữu.
+- Áp dụng Redis cho cache token bị thu hồi hoặc session realtime.
+- Thiết lập CI (GitHub Actions) chạy lint/test tự động trên mỗi PR.

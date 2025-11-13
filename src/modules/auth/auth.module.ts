@@ -10,6 +10,7 @@ import { User } from '../users/user.entity';
 import { JwtTokenService } from './jwt-token.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
 
 @Module({
   imports: [
@@ -34,7 +35,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtTokenService, JwtStrategy, JwtAuthGuard],
-  exports: [AuthService, JwtTokenService, JwtAuthGuard],
+  providers: [AuthService, JwtTokenService, JwtStrategy, JwtAuthGuard, RolesGuard],
+  exports: [AuthService, JwtTokenService, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

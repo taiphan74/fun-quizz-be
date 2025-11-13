@@ -5,8 +5,8 @@ import { User } from '../users/user.entity';
 import { UserResponseDto } from '../users/user.dto';
 
 type JwtSource =
-  | Pick<User, 'id' | 'username' | 'email'>
-  | Pick<UserResponseDto, 'id' | 'username' | 'email'>;
+  | Pick<User, 'id' | 'username' | 'email' | 'role'>
+  | Pick<UserResponseDto, 'id' | 'username' | 'email' | 'role'>;
 
 @Injectable()
 export class JwtTokenService {
@@ -17,6 +17,7 @@ export class JwtTokenService {
       sub: user.id,
       username: user.username,
       email: user.email,
+      role: user.role,
     };
     return this.jwtService.sign(payload);
   }

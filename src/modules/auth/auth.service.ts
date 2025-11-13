@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
-import { User } from '../users/user.entity';
+import { User, UserRole } from '../users/user.entity';
 import { AuthResponseDto, LoginDto, RegisterDto } from './auth.dto';
 import { toUserResponse } from '../users/user.mapper';
 import { JwtTokenService } from './jwt-token.service';
@@ -36,7 +36,10 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
-    const user = await this.usersService.create(registerDto);
+    const user = await this.usersService.create({
+      ...registerDto,
+      role: UserRole.USER,
+    });
     const accessToken = this.jwtTokenService.generateAccessToken(user);
     return { user, accessToken };
   }

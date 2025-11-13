@@ -2,11 +2,13 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Exclude, Expose } from 'class-transformer';
 import {
   IsEmail,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
+import { UserRole } from './user.entity';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'John', description: 'First name of the user' })
@@ -34,6 +36,15 @@ export class CreateUserDto {
   @IsNotEmpty()
   @MinLength(6)
   password: string;
+
+  @ApiProperty({
+    enum: UserRole,
+    required: false,
+    default: UserRole.USER,
+  })
+  @IsEnum(UserRole)
+  @IsOptional()
+  role?: UserRole;
 }
 
 export class UpdateUserDto {
@@ -62,6 +73,11 @@ export class UpdateUserDto {
   @IsOptional()
   @MinLength(6)
   password?: string;
+
+  @ApiProperty({ enum: UserRole, required: false })
+  @IsEnum(UserRole)
+  @IsOptional()
+  role?: UserRole;
 }
 
 @Exclude()
@@ -80,6 +96,9 @@ export class UserResponseDto {
 
   @Expose()
   email: string;
+
+  @Expose()
+  role: UserRole;
 
   @Expose()
   createdAt: Date;
