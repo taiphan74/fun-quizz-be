@@ -5,7 +5,6 @@ import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/user.entity';
 import { AuthResponseDto, LoginDto, RegisterDto } from './auth.dto';
-import { UserResponseDto } from '../users/user.dto';
 import { toUserResponse } from '../users/user.mapper';
 import { JwtTokenService } from './jwt-token.service';
 
@@ -20,8 +19,7 @@ export class AuthService {
 
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
     const { usernameOrEmail, password } = loginDto;
-    const user =
-      await this.usersService.findByUsernameOrEmail(usernameOrEmail);
+    const user = await this.usersService.findByUsernameOrEmail(usernameOrEmail);
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
