@@ -25,9 +25,8 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column({ select: false })
   @Exclude()
-  @Column({ name: 'hash_password' })
+  @Column({ name: 'hash_password', select: false })
   hashPassword: string;
 
   @CreateDateColumn()
