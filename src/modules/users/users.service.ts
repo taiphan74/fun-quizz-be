@@ -54,4 +54,21 @@ export class UsersService {
     if (!user) throw new NotFoundException(`User with id ${id} not found`);
     return user;
   }
+
+  async findByUsernameOrEmail(usernameOrEmail: string): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: [{ username: usernameOrEmail }, { email: usernameOrEmail }],
+      withDeleted: false,
+      select: [
+        'id',
+        'firstName',
+        'lastName',
+        'username',
+        'email',
+        'hashPassword',
+        'createdAt',
+        'updatedAt',
+      ],
+    });
+  }
 }

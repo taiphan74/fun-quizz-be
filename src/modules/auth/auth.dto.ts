@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, MinLength } from 'class-validator';
-import { CreateUserDto } from '../users/user.dto';
+import { CreateUserDto, UserResponseDto } from '../users/user.dto';
 
 export class LoginDto {
   @ApiProperty({
@@ -17,3 +17,13 @@ export class LoginDto {
 }
 
 export class RegisterDto extends CreateUserDto {}
+
+export class AuthResponseDto {
+  @ApiProperty({ type: UserResponseDto })
+  user: UserResponseDto;
+
+  @ApiProperty({
+    description: 'JWT access token that must be sent as a Bearer token',
+  })
+  accessToken: string;
+}
