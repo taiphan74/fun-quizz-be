@@ -7,14 +7,18 @@ import { User, UserRole } from '../users/user.entity';
 import { AuthResponseDto, LoginDto, RegisterDto } from './auth.dto';
 import { toUserResponse } from '../users/user.mapper';
 import { JwtTokenService } from './jwt-token.service';
+import { RedisService } from '../../common/redis/redis.service';
 
 @Injectable()
 export class AuthService {
+  private readonly refreshTokenKeyPrefix = 'refresh-token';
+
   constructor(
     private readonly usersService: UsersService,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly jwtTokenService: JwtTokenService,
+    private readonly redisService: RedisService,
   ) {}
 
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
@@ -32,7 +36,9 @@ export class AuthService {
 
     const userResponse = toUserResponse(user);
     const accessToken = this.jwtTokenService.generateAccessToken(user);
-    return { user: userResponse, accessToken };
+    const refreshToken = this.jwtTokenService.generateRefreshToken(user);
+    await this.storeRefreshToken(user.id, refreshToken);
+    return { user: userResponse, accessToken, refreshToken };
   }
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
@@ -41,6 +47,20 @@ export class AuthService {
       role: UserRole.USER,
     });
     const accessToken = this.jwtTokenService.generateAccessToken(user);
-    return { user, accessToken };
+    const refreshToken = this.jwtTokenService.generateRefreshToken(user);
+    await this.storeRefreshToken(user.id, refreshToken);
+    return { user, accessToken, refreshToken };
+  }
+
+  private getRefreshTokenKey(userId: string): string {
+    return `${this.refreshTokenKeyPrefix}:${userId}`;
+  }
+ 
+  private async storeRefreshToken(
+    userId: string,
+    refreshToken: string,
+  ): Promise<void> {
+    const ttl = this.jwtTokenService.getRefreshTokenTtlSeconds();
+    await this.redisService.set(this.getRefreshTokenKey(userId), refreshToken, ttl);
   }
 }
