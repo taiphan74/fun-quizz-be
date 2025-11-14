@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from './types/jwt-payload.interface';
 import { User } from '../users/user.entity';
 import { UserResponseDto } from '../users/user.dto';
+import { AppConfigService } from '../../config/app-config.service';
 
 type JwtSource =
   | Pick<User, 'id' | 'username' | 'email' | 'role'>
@@ -12,24 +12,15 @@ type JwtSource =
 @Injectable()
 export class JwtTokenService {
   private readonly refreshTokenSecret: string;
-  private readonly defaultRefreshTtlSeconds = 60 * 60 * 24 * 7; // 7 days
   private readonly refreshTokenExpiresInSeconds: number;
 
   constructor(
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
+    private readonly configService: AppConfigService,
   ) {
-    this.refreshTokenSecret = this.configService.get<string>(
-      'JWT_REFRESH_SECRET',
-      this.configService.get<string>('JWT_SECRET', 'changeme'),
-    );
-    const refreshExpiresInConfig =
-      this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ??
-      String(this.defaultRefreshTtlSeconds);
-    const parsedTtl = parseInt(refreshExpiresInConfig, 10);
-    this.refreshTokenExpiresInSeconds = Number.isNaN(parsedTtl)
-      ? this.defaultRefreshTtlSeconds
-      : parsedTtl;
+    const refreshConfig = this.configService.getJwtRefreshConfig();
+    this.refreshTokenSecret = refreshConfig.secret;
+    this.refreshTokenExpiresInSeconds = refreshConfig.expiresIn;
   }
 
   generateAccessToken(user: JwtSource): string {

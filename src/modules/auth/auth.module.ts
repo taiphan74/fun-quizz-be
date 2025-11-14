@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
@@ -11,6 +10,7 @@ import { JwtTokenService } from './jwt-token.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { AppConfigService } from '../../config/app-config.service';
 
 @Module({
   imports: [
@@ -18,17 +18,13 @@ import { RolesGuard } from './guards/roles.guard';
     UsersModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const expiresInConfig = config.get<string>('JWT_EXPIRES_IN', '3600');
-        const expiresInNumber = Number(expiresInConfig);
+      inject: [AppConfigService],
+      useFactory: (config: AppConfigService) => {
+        const jwtConfig = config.getJwtConfig();
         return {
-          secret: config.get<string>('JWT_SECRET', 'changeme'),
+          secret: jwtConfig.secret,
           signOptions: {
-            expiresIn: Number.isNaN(expiresInNumber)
-              ? 3600
-              : expiresInNumber,
+            expiresIn: jwtConfig.expiresIn,
           },
         };
       },

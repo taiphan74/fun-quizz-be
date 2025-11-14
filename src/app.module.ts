@@ -1,28 +1,31 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { RedisModule } from './common/redis/redis.module';
+import { AppConfigModule } from './config/app-config.module';
+import { AppConfigService } from './config/app-config.service';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    AppConfigModule,
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({
+      useFactory: (config: AppConfigService) => {
+        const database = config.getDatabaseConfig();
+        return {
         type: 'postgres',
-        host: config.get<string>('DB_HOST', 'localhost'),
-        port: parseInt(config.get<string>('DB_PORT', '5432'), 10),
-        username: config.get<string>('DB_USER', 'fun-quizz'),
-        password: config.get<string>('DB_PASSWORD', 'fun-quizz'),
-        database: config.get<string>('DB_NAME', 'fun-quizz'),
+        host: database.host,
+        port: database.port,
+        username: database.username,
+        password: database.password,
+        database: database.database,
         autoLoadEntities: true,
         synchronize: true,
-      }),
-      inject: [ConfigService],
+      };
+      },
+      inject: [AppConfigService],
     }),
     RedisModule,
     UsersModule,
