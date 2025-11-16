@@ -4,10 +4,17 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
 import { User, UserRole } from '../users/user.entity';
-import { AuthResponseDto, LoginDto, RegisterDto } from './auth.dto';
+import {
+  AccessTokenResponseDto,
+  AuthResponseDto,
+  LoginDto,
+  RefreshTokenDto,
+  RegisterDto,
+} from './auth.dto';
 import { toUserResponse } from '../users/user.mapper';
 import { JwtTokenService } from './jwt-token.service';
 import { RedisService } from '../../common/redis/redis.service';
+import { JwtPayload } from './types/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
@@ -52,15 +59,54 @@ export class AuthService {
     return { user, accessToken, refreshToken };
   }
 
+  async refreshToken(
+    refreshTokenDto: RefreshTokenDto,
+  ): Promise<AccessTokenResponseDto> {
+    const { refreshToken } = refreshTokenDto;
+    const payload = this.verifyRefreshToken(refreshToken);
+    const user = await this.userRepository.findOne({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const storedRefreshToken = await this.redisService.get(
+      this.getRefreshTokenKey(user.id),
+    );
+
+    if (!storedRefreshToken || storedRefreshToken !== refreshToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const accessToken = this.jwtTokenService.generateAccessToken(user);
+    await this.storeRefreshToken(user.id, refreshToken);
+
+    return { accessToken };
+  }
+
   private getRefreshTokenKey(userId: string): string {
     return `${this.refreshTokenKeyPrefix}:${userId}`;
   }
- 
+
   private async storeRefreshToken(
     userId: string,
     refreshToken: string,
   ): Promise<void> {
     const ttl = this.jwtTokenService.getRefreshTokenTtlSeconds();
-    await this.redisService.set(this.getRefreshTokenKey(userId), refreshToken, ttl);
+    await this.redisService.set(
+      this.getRefreshTokenKey(userId),
+      refreshToken,
+      ttl,
+    );
+  }
+
+  private verifyRefreshToken(refreshToken: string): JwtPayload {
+    try {
+      return this.jwtTokenService.verifyRefreshToken(refreshToken);
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
   }
 }

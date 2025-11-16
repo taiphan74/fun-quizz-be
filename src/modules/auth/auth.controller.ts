@@ -1,7 +1,13 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { AuthResponseDto, LoginDto, RegisterDto } from './auth.dto';
+import {
+  AccessTokenResponseDto,
+  AuthResponseDto,
+  LoginDto,
+  RefreshTokenDto,
+  RegisterDto,
+} from './auth.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -24,5 +30,16 @@ export class AuthController {
   })
   register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {
     return this.authService.register(registerDto);
+  }
+
+  @Post('refresh')
+  @ApiOkResponse({
+    description: 'Access token successfully refreshed',
+    type: AccessTokenResponseDto,
+  })
+  refresh(
+    @Body() refreshTokenDto: RefreshTokenDto,
+  ): Promise<AccessTokenResponseDto> {
+    return this.authService.refreshToken(refreshTokenDto);
   }
 }

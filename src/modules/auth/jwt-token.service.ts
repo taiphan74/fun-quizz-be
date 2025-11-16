@@ -36,6 +36,12 @@ export class JwtTokenService {
     });
   }
 
+  verifyRefreshToken(token: string): JwtPayload {
+    return this.jwtService.verify<JwtPayload>(token, {
+      secret: this.refreshTokenSecret,
+    });
+  }
+
   getRefreshTokenTtlSeconds(): number {
     return this.refreshTokenExpiresInSeconds;
   }
