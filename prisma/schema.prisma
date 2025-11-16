@@ -5,8 +5,7 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -15,8 +14,8 @@ datasource db {
 }
 
 enum UserRole {
-  admin
-  user
+  ADMIN @map("admin")
+  USER @map("user")
 }
 
 model User {
@@ -26,7 +25,7 @@ model User {
   username     String    @unique
   email        String    @unique
   hashPassword String    @map("hash_password")
-  role         UserRole  @default(user)
+  role         UserRole  @default(USER)
   createdAt    DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
   deletedAt    DateTime? @db.Timestamptz(6)

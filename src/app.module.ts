@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './modules/users/users.module';
@@ -8,27 +7,12 @@ import { QuestionsModule } from './modules/questions/questions.module';
 import { AnswersModule } from './modules/answers/answers.module';
 import { RedisModule } from './common/redis/redis.module';
 import { AppConfigModule } from './config/app-config.module';
-import { AppConfigService } from './config/app-config.service';
+import { PrismaModule } from './common/prisma/prisma.module';
 
 @Module({
   imports: [
     AppConfigModule,
-    TypeOrmModule.forRootAsync({
-      useFactory: (config: AppConfigService) => {
-        const database = config.getDatabaseConfig();
-        return {
-          type: 'postgres',
-          host: database.host,
-          port: database.port,
-          username: database.username,
-          password: database.password,
-          database: database.database,
-          autoLoadEntities: true,
-          synchronize: true,
-        };
-      },
-      inject: [AppConfigService],
-    }),
+    PrismaModule,
     RedisModule,
     UsersModule,
     AuthModule,

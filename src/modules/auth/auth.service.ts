@@ -1,9 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
-import { User, UserRole } from '../users/user.entity';
+import { UserRole } from '../users/user-role.enum';
 import {
   AccessTokenResponseDto,
   AuthResponseDto,
@@ -15,6 +13,7 @@ import { toUserResponse } from '../users/user.mapper';
 import { JwtTokenService } from './jwt-token.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { JwtPayload } from './types/jwt-payload.interface';
+import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
@@ -22,10 +21,9 @@ export class AuthService {
 
   constructor(
     private readonly usersService: UsersService,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
     private readonly jwtTokenService: JwtTokenService,
     private readonly redisService: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
@@ -64,7 +62,7 @@ export class AuthService {
   ): Promise<AccessTokenResponseDto> {
     const { refreshToken } = refreshTokenDto;
     const payload = this.verifyRefreshToken(refreshToken);
-    const user = await this.userRepository.findOne({
+    const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
 

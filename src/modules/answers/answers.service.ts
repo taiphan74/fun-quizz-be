@@ -1,36 +1,27 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Answer } from './answer.entity';
+import type { Answer, Question } from '@prisma/client';
 import { CreateAnswerDto, UpdateAnswerDto } from './answer.dto';
-import { Question } from '../questions/question.entity';
+import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
 export class AnswersService {
-  constructor(
-    @InjectRepository(Answer)
-    private readonly answerRepository: Repository<Answer>,
-    @InjectRepository(Question)
-    private readonly questionRepository: Repository<Question>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(
     questionId: string,
     createAnswerDto: CreateAnswerDto,
   ): Promise<Answer> {
-    const question = await this.findQuestion(questionId);
-    const answer = this.answerRepository.create({
-      ...createAnswerDto,
-      question,
+    await this.ensureQuestionExists(questionId);
+    return this.prisma.answer.create({
+      data: { ...createAnswerDto, questionId },
     });
-    return this.answerRepository.save(answer);
   }
 
   async findAll(questionId: string): Promise<Answer[]> {
     await this.ensureQuestionExists(questionId);
-    return this.answerRepository.find({
+    return this.prisma.answer.findMany({
       where: { questionId },
-      order: { createdAt: 'ASC' },
+      orderBy: { createdAt: 'asc' },
     });
   }
 
@@ -40,8 +31,10 @@ export class AnswersService {
     updateAnswerDto: UpdateAnswerDto,
   ): Promise<Answer> {
     const answer = await this.findAnswer(questionId, answerId);
-    Object.assign(answer, updateAnswerDto);
-    return this.answerRepository.save(answer);
+    return this.prisma.answer.update({
+      where: { id: answer.id },
+      data: updateAnswerDto,
+    });
   }
 
   async remove(
@@ -49,7 +42,7 @@ export class AnswersService {
     answerId: string,
   ): Promise<{ message: string; answerId: string }> {
     const answer = await this.findAnswer(questionId, answerId);
-    await this.answerRepository.remove(answer);
+    await this.prisma.answer.delete({ where: { id: answer.id } });
     return { message: 'Answer removed', answerId };
   }
 
@@ -58,7 +51,7 @@ export class AnswersService {
   }
 
   private async findQuestion(questionId: string): Promise<Question> {
-    const question = await this.questionRepository.findOne({
+    const question = await this.prisma.question.findUnique({
       where: { id: questionId },
     });
 
@@ -73,7 +66,7 @@ export class AnswersService {
     questionId: string,
     answerId: string,
   ): Promise<Answer> {
-    const answer = await this.answerRepository.findOne({
+    const answer = await this.prisma.answer.findFirst({
       where: { id: answerId, questionId },
     });
 

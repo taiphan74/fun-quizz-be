@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { User } from './user.entity';
+import type { User } from '@prisma/client';
 import { UserResponseDto } from './user.dto';
 
 export const toUserResponse = (user: User): UserResponseDto =>
