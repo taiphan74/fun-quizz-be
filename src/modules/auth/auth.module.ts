@@ -31,7 +31,13 @@ import { AppConfigService } from '../../config/app-config.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtTokenService, JwtStrategy, JwtAuthGuard, RolesGuard],
+  providers: [
+    AuthService,
+    JwtTokenService,
+    JwtStrategy,
+    JwtAuthGuard,
+    RolesGuard,
+  ],
   exports: [AuthService, JwtTokenService, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}
