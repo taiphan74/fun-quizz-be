@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  user
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  firstName    String
+  lastName     String
+  username     String    @unique
+  email        String    @unique
+  hashPassword String    @map("hash_password")
+  role         UserRole  @default(user)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt    DateTime? @db.Timestamptz(6)
+
+  @@map("users")
+}
+
+model Question {
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String
+  description String?   @db.Text
+  isActive    Boolean   @default(true)
+  answers     Answer[]
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt   DateTime? @db.Timestamptz(6)
+
+  @@map("questions")
+}
+
+model Answer {
+  id         String    @id @default(uuid()) @db.Uuid
+  text       String
+  isCorrect  Boolean   @default(false)
+  questionId String    @map("question_id") @db.Uuid
+  question   Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt  DateTime? @db.Timestamptz(6)
+
+  @@index([questionId])
+  @@map("answers")
+}
