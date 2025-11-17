@@ -11,15 +11,23 @@ import {
 import { UserRole } from './user-role.enum';
 
 export class CreateUserDto {
-  @ApiProperty({ example: 'John', description: 'First name of the user' })
+  @ApiProperty({
+    example: 'John',
+    description: 'First name of the user',
+    required: false,
+  })
   @IsString()
-  @IsNotEmpty()
-  firstName: string;
+  @IsOptional()
+  firstName?: string;
 
-  @ApiProperty({ example: 'Doe', description: 'Last name of the user' })
+  @ApiProperty({
+    example: 'Doe',
+    description: 'Last name of the user',
+    required: false,
+  })
   @IsString()
-  @IsNotEmpty()
-  lastName: string;
+  @IsOptional()
+  lastName?: string;
 
   @ApiProperty({ example: 'johndoe', description: 'Unique username' })
   @IsString()

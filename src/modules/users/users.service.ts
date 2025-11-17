@@ -11,12 +11,14 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createUserDto: CreateUserDto): Promise<UserResponseDto> {
-    const { password, role, ...rest } = createUserDto;
+    const { password, role, firstName, lastName, ...rest } = createUserDto;
     const hash = await bcrypt.hash(password, 10);
     const userRole = role ?? UserRole.USER;
     const savedUser = await this.prisma.user.create({
       data: {
         ...rest,
+        firstName: firstName ?? '',
+        lastName: lastName ?? '',
         role: userRole,
         hashPassword: hash,
       },
