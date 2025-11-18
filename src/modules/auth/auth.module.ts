@@ -9,6 +9,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { AppConfigService } from '../../config/app-config.service';
+import { GoogleStrategy } from './strategies/google.strategy';
+import { GoogleOAuthGuard } from './guards/google-auth.guard';
 
 @Module({
   imports: [
@@ -34,7 +36,15 @@ import { AppConfigService } from '../../config/app-config.service';
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
+    GoogleStrategy,
+    GoogleOAuthGuard,
   ],
-  exports: [AuthService, JwtTokenService, JwtAuthGuard, RolesGuard],
+  exports: [
+    AuthService,
+    JwtTokenService,
+    JwtAuthGuard,
+    RolesGuard,
+    GoogleOAuthGuard,
+  ],
 })
 export class AuthModule {}

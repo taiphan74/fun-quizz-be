@@ -50,6 +50,15 @@ NestJS (v11) API phục vụ cho nền tảng Fun Quizz: quản lý người dù
 
    JWT_SECRET=super-secret-change-me
    JWT_EXPIRES_IN=3600
+   JWT_REFRESH_SECRET=super-refresh-secret-change-me
+   JWT_REFRESH_EXPIRES_IN=604800
+
+   # Lưu ý: phải trùng với Authorized redirect URIs trong Google Cloud Console,
+   # nếu không sẽ gặp lỗi 400: redirect_uri_mismatch
+   GOOGLE_CLIENT_ID=<your-google-client-id>
+   GOOGLE_CLIENT_SECRET=<your-google-client-secret>
+   GOOGLE_CALLBACK_URL=http://localhost:3000/auth/google/callback
+   GOOGLE_FRONTEND_REDIRECT_URL=http://localhost:3000/
    ```
 
 ## Sử dụng Docker

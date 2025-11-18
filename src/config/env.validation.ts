@@ -17,6 +17,10 @@ export interface EnvironmentVariables {
   REDIS_USERNAME?: string;
   REDIS_PASSWORD?: string;
   REDIS_DB: number;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  GOOGLE_CALLBACK_URL: string;
+  GOOGLE_FRONTEND_REDIRECT_URL: string;
 }
 
 export const envValidationSchema = Joi.object<EnvironmentVariables>({
@@ -38,4 +42,8 @@ export const envValidationSchema = Joi.object<EnvironmentVariables>({
   REDIS_USERNAME: Joi.string().optional(),
   REDIS_PASSWORD: Joi.string().optional(),
   REDIS_DB: Joi.number().min(0).required(),
+  GOOGLE_CLIENT_ID: Joi.string().required(),
+  GOOGLE_CLIENT_SECRET: Joi.string().required(),
+  GOOGLE_CALLBACK_URL: Joi.string().uri().required(),
+  GOOGLE_FRONTEND_REDIRECT_URL: Joi.string().uri().required(),
 });

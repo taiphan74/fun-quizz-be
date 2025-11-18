@@ -54,4 +54,16 @@ export class AppConfigService {
       db: this.configService.getOrThrow<number>('REDIS_DB'),
     };
   }
+
+  getGoogleOAuthConfig() {
+    return {
+      clientId: this.configService.getOrThrow<string>('GOOGLE_CLIENT_ID'),
+      clientSecret:
+        this.configService.getOrThrow<string>('GOOGLE_CLIENT_SECRET'),
+      callbackUrl: this.configService.getOrThrow<string>('GOOGLE_CALLBACK_URL'),
+      frontendRedirectUrl: this.configService.getOrThrow<string>(
+        'GOOGLE_FRONTEND_REDIRECT_URL',
+      ),
+    };
+  }
 }
