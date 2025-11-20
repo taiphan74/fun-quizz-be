@@ -53,11 +53,6 @@ export class AuthResponseDto {
     description: 'JWT access token that must be sent as a Bearer token',
   })
   accessToken: string;
-
-  @ApiProperty({
-    description: 'JWT refresh token used to request new access tokens',
-  })
-  refreshToken: string;
 }
 
 export class AccessTokenResponseDto {

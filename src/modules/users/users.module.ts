@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 
 @Module({
-  controllers: [UsersController, UserProfileController],
+  controllers: [UserProfileController, UsersController],
   providers: [UsersService, JwtAuthGuard, RolesGuard],
   exports: [UsersService],
 })

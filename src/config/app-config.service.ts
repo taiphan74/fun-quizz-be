@@ -19,6 +19,14 @@ export class AppConfigService {
     return this.configService.getOrThrow<number>('PORT');
   }
 
+  get corsOrigins(): string[] {
+    const origins = this.configService.getOrThrow<string>('CORS_ORIGINS');
+    return origins
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter((origin) => origin.length > 0);
+  }
+
   getDatabaseConfig() {
     return {
       host: this.configService.getOrThrow<string>('DB_HOST'),

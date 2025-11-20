@@ -23,7 +23,11 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<{ user?: JwtPayload }>();
+    const request = context.switchToHttp().getRequest<{
+      user?: JwtPayload;
+      path?: string;
+      method?: string;
+    }>();
     const user = request.user;
 
     if (!user) {
@@ -31,6 +35,17 @@ export class RolesGuard implements CanActivate {
     }
 
     if (!requiredRoles.includes(user.role)) {
+      // Debug log to inspect which routes are failing role checks
+      // eslint-disable-next-line no-console
+      console.log(
+        'RolesGuard blocked request',
+        JSON.stringify({
+          path: request.path,
+          method: request.method,
+          userRole: user.role,
+          requiredRoles,
+        }),
+      );
       throw new ForbiddenException('Insufficient role');
     }
 

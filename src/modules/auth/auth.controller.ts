@@ -36,8 +36,15 @@ export class AuthController {
     description: 'User successfully authenticated',
     type: AuthResponseDto,
   })
-  login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const { refreshToken, ...response } = await this.authService.login(
+      loginDto,
+    );
+    this.setRefreshTokenCookie(res, refreshToken);
+    return response;
   }
 
   @Get('google')
@@ -60,13 +67,9 @@ export class AuthController {
     if (!profile) {
       throw new UnauthorizedException('Google authentication failed');
     }
-    const authResponse = await this.authService.loginWithGoogleProfile(profile);
-    res.cookie('refreshToken', authResponse.refreshToken, {
-      httpOnly: true,
-      secure: this.appConfigService.nodeEnv === 'production',
-      sameSite: 'lax',
-      path: '/',
-    });
+    const { refreshToken } =
+      await this.authService.loginWithGoogleProfile(profile);
+    this.setRefreshTokenCookie(res, refreshToken);
     const { frontendRedirectUrl } =
       this.appConfigService.getGoogleOAuthConfig();
     res.redirect(frontendRedirectUrl);
@@ -77,8 +80,15 @@ export class AuthController {
     description: 'User successfully registered',
     type: AuthResponseDto,
   })
-  register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {
-    return this.authService.register(registerDto);
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const { refreshToken, ...response } = await this.authService.register(
+      registerDto,
+    );
+    this.setRefreshTokenCookie(res, refreshToken);
+    return response;
   }
 
   @Post('refresh')
@@ -86,9 +96,25 @@ export class AuthController {
     description: 'Access token successfully refreshed',
     type: AccessTokenResponseDto,
   })
-  refresh(
-    @Body() refreshTokenDto: RefreshTokenDto,
-  ): Promise<AccessTokenResponseDto> {
-    return this.authService.refreshToken(refreshTokenDto);
+  refresh(@Req() req: Request): Promise<AccessTokenResponseDto> {
+    const cookies = (req as unknown as { cookies?: Record<string, string> })
+      .cookies;
+    const refreshToken = cookies?.refreshToken;
+    // Debug: log refresh token from cookies
+    // eslint-disable-next-line no-console
+    console.log('Refresh token from cookies:', refreshToken);
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token is missing');
+    }
+    return this.authService.refreshToken({ refreshToken });
+  }
+
+  private setRefreshTokenCookie(res: Response, refreshToken: string): void {
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: this.appConfigService.nodeEnv === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
   }
 }

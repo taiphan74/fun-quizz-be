@@ -34,7 +34,9 @@ export class AuthService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async login(loginDto: LoginDto): Promise<AuthResponseDto> {
+  async login(
+    loginDto: LoginDto,
+  ): Promise<AuthResponseDto & { refreshToken: string }> {
     const { usernameOrEmail, password } = loginDto;
     const user = await this.usersService.findByUsernameOrEmail(usernameOrEmail);
 
@@ -54,7 +56,9 @@ export class AuthService {
     return { user: userResponse, accessToken, refreshToken };
   }
 
-  async loginWithGoogleProfile(profile: Profile): Promise<AuthResponseDto> {
+  async loginWithGoogleProfile(
+    profile: Profile,
+  ): Promise<AuthResponseDto & { refreshToken: string }> {
     return this.authenticateGoogleAccount({
       email: profile.emails?.[0]?.value,
       givenName: profile.name?.givenName,
@@ -62,7 +66,9 @@ export class AuthService {
     });
   }
 
-  async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
+  async register(
+    registerDto: RegisterDto,
+  ): Promise<AuthResponseDto & { refreshToken: string }> {
     const user = await this.usersService.create({
       ...registerDto,
       role: UserRole.USER,
@@ -102,7 +108,7 @@ export class AuthService {
 
   private async authenticateGoogleAccount(
     payload: GoogleAccountPayload,
-  ): Promise<AuthResponseDto> {
+  ): Promise<AuthResponseDto & { refreshToken: string }> {
     const user = await this.findOrCreateGoogleUser(payload);
     const userResponse = toUserResponse(user);
     const accessToken = this.jwtTokenService.generateAccessToken(user);

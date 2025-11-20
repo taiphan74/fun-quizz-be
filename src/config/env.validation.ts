@@ -3,6 +3,7 @@ import * as Joi from 'joi';
 export interface EnvironmentVariables {
   NODE_ENV: 'development' | 'production' | 'test';
   PORT: number;
+  CORS_ORIGINS: string;
   DB_HOST: string;
   DB_PORT: number;
   DB_USER: string;
@@ -28,6 +29,7 @@ export const envValidationSchema = Joi.object<EnvironmentVariables>({
     .valid('development', 'production', 'test')
     .default('development'),
   PORT: Joi.number().port().required(),
+  CORS_ORIGINS: Joi.string().required(),
   DB_HOST: Joi.string().required(),
   DB_PORT: Joi.number().port().required(),
   DB_USER: Joi.string().required(),

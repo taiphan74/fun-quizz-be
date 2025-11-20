@@ -4,13 +4,22 @@ import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { AppConfigService } from './config/app-config.service';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const reflector = app.get(Reflector);
+  const appConfigService = app.get(AppConfigService);
+
+  console.log('CORS origins:', appConfigService.corsOrigins);
 
   app.use(helmet());
-  app.enableCors();
+  app.use(cookieParser());
+  app.enableCors({
+    origin: appConfigService.corsOrigins,
+    credentials: true,
+  });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
