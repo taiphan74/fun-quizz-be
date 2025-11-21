@@ -16,6 +16,7 @@ import {
   LoginDto,
   RefreshTokenDto,
   RegisterDto,
+  ForgotPasswordDto,
 } from './auth.dto';
 import { GoogleOAuthGuard } from './guards/google-auth.guard';
 import type { Request } from 'express';
@@ -107,6 +108,14 @@ export class AuthController {
       throw new UnauthorizedException('Refresh token is missing');
     }
     return this.authService.refreshToken({ refreshToken });
+  }
+
+  @Post('forgot-password')
+  @ApiOkResponse({ description: 'Sends OTP to email if account exists' })
+  forgotPassword(
+    @Body() forgotPasswordDto: ForgotPasswordDto,
+  ): Promise<{ message: string }> {
+    return this.authService.requestPasswordReset(forgotPasswordDto);
   }
 
   private setRefreshTokenCookie(res: Response, refreshToken: string): void {

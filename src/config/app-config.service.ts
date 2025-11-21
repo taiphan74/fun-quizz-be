@@ -74,4 +74,14 @@ export class AppConfigService {
       ),
     };
   }
+
+  getMailConfig() {
+    return {
+      host: this.configService.getOrThrow<string>('MAIL_HOST'),
+      port: this.configService.getOrThrow<number>('MAIL_PORT'),
+      user: this.configService.getOrThrow<string>('MAIL_USER'),
+      password: this.configService.getOrThrow<string>('MAIL_PASSWORD'),
+      from: this.configService.getOrThrow<string>('MAIL_FROM'),
+    };
+  }
 }

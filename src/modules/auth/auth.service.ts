@@ -11,12 +11,14 @@ import {
   LoginDto,
   RefreshTokenDto,
   RegisterDto,
+  ForgotPasswordDto,
 } from './auth.dto';
 import { toUserResponse } from '../users/user.mapper';
 import { JwtTokenService } from './jwt-token.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { JwtPayload } from './types/jwt-payload.interface';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 
 interface GoogleAccountPayload {
   email?: string | null;
@@ -27,11 +29,13 @@ interface GoogleAccountPayload {
 @Injectable()
 export class AuthService {
   private readonly refreshTokenKeyPrefix = 'refresh-token';
+  private readonly resetOtpKeyPrefix = 'password-reset-otp';
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtTokenService: JwtTokenService,
     private readonly redisService: RedisService,
     private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
   ) {}
 
   async login(
@@ -106,6 +110,24 @@ export class AuthService {
     return { accessToken };
   }
 
+  async requestPasswordReset(
+    forgotPasswordDto: ForgotPasswordDto,
+  ): Promise<{ message: string }> {
+    const email = forgotPasswordDto.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      return { message: 'If the email exists, an OTP has been sent' };
+    }
+
+    const otp = this.generateOtp();
+    const ttlSeconds = 10 * 60; // 10 minutes
+    await this.redisService.set(this.getResetOtpKey(email), otp, ttlSeconds);
+    await this.mailService.sendOtpEmail(email, otp);
+
+    return { message: 'OTP sent to email' };
+  }
+
   private async authenticateGoogleAccount(
     payload: GoogleAccountPayload,
   ): Promise<AuthResponseDto & { refreshToken: string }> {
@@ -139,6 +161,14 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  private getResetOtpKey(email: string): string {
+    return `${this.resetOtpKeyPrefix}:${email}`;
+  }
+
+  private generateOtp(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
   private async findOrCreateGoogleUser(

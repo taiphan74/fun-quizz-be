@@ -61,3 +61,13 @@ export class AccessTokenResponseDto {
   })
   accessToken: string;
 }
+
+export class ForgotPasswordDto {
+  @ApiProperty({
+    description: 'Email associated with the account that requests password reset',
+    example: 'user@example.com',
+  })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+}

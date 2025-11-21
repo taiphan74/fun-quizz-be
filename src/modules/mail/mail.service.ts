@@ -1,0 +1,19 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { MailerService } from '@nestjs-modules/mailer';
+
+@Injectable()
+export class MailService {
+  private readonly logger = new Logger(MailService.name);
+
+  constructor(private readonly mailerService: MailerService) {}
+
+  async sendOtpEmail(to: string, otp: string): Promise<void> {
+    await this.mailerService.sendMail({
+      to,
+      subject: 'Your password reset code',
+      text: `Use this code to reset your password: ${otp}`,
+      html: `<p>Use this code to reset your password:</p><h2>${otp}</h2>`,
+    });
+    this.logger.log(`Sent OTP email to ${to}`);
+  }
+}

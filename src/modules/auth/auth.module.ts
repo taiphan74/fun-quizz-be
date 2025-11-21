@@ -11,10 +11,12 @@ import { RolesGuard } from './guards/roles.guard';
 import { AppConfigService } from '../../config/app-config.service';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { GoogleOAuthGuard } from './guards/google-auth.guard';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
     UsersModule,
+    MailModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       inject: [AppConfigService],
