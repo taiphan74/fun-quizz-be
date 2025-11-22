@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma, User } from '@prisma/client';
+import { AuthProviderType, Prisma, type User } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { CreateUserDto, UpdateUserDto, UserResponseDto } from './user.dto';
 import { toUserResponse, toUsersResponse } from './user.mapper';
@@ -14,15 +14,22 @@ export class UsersService {
     const { password, role, firstName, lastName, ...rest } = createUserDto;
     const hash = await bcrypt.hash(password, 10);
     const userRole = role ?? UserRole.USER;
-    const savedUser = await this.prisma.user.create({
-      data: {
-        ...rest,
-        firstName: firstName ?? '',
-        lastName: lastName ?? '',
-        role: userRole,
-        hashPassword: hash,
-      },
-    });
+    const savedUser = await this.prisma.$transaction((tx) =>
+      tx.user.create({
+        data: {
+          ...rest,
+          firstName: firstName ?? '',
+          lastName: lastName ?? '',
+          role: userRole,
+          hashPassword: hash,
+          authProviders: {
+            create: {
+              provider: AuthProviderType.LOCAL,
+            },
+          },
+        },
+      }),
+    );
     return toUserResponse(savedUser);
   }
 

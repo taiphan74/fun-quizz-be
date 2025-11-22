@@ -9,14 +9,14 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { AppConfigService } from '../../config/app-config.service';
-import { GoogleStrategy } from './strategies/google.strategy';
-import { GoogleOAuthGuard } from './guards/google-auth.guard';
 import { MailModule } from '../mail/mail.module';
+import { GoogleAuthModule } from './google-auth.module';
 
 @Module({
   imports: [
     UsersModule,
     MailModule,
+    GoogleAuthModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       inject: [AppConfigService],
@@ -25,7 +25,7 @@ import { MailModule } from '../mail/mail.module';
         return {
           secret: jwtConfig.secret,
           signOptions: {
-            expiresIn: jwtConfig.expiresIn,
+            expiresIn: jwtConfig.expiresInSeconds,
           },
         };
       },
@@ -38,15 +38,12 @@ import { MailModule } from '../mail/mail.module';
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
-    GoogleStrategy,
-    GoogleOAuthGuard,
   ],
   exports: [
     AuthService,
     JwtTokenService,
     JwtAuthGuard,
     RolesGuard,
-    GoogleOAuthGuard,
   ],
 })
 export class AuthModule {}

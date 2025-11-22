@@ -106,6 +106,9 @@ export class UserResponseDto {
   email: string;
 
   @Expose()
+  emailVerified: boolean;
+
+  @Expose()
   role: UserRole;
 
   @Expose()

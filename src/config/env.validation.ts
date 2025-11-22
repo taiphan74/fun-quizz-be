@@ -10,9 +10,9 @@ export interface EnvironmentVariables {
   DB_PASSWORD: string;
   DB_NAME: string;
   JWT_SECRET: string;
-  JWT_EXPIRES_IN: number;
+  JWT_EXPIRES_IN: string;
   JWT_REFRESH_SECRET: string;
-  JWT_REFRESH_EXPIRES_IN: number;
+  JWT_REFRESH_EXPIRES_IN: string;
   REDIS_HOST: string;
   REDIS_PORT: number;
   REDIS_USERNAME?: string;
@@ -27,6 +27,7 @@ export interface EnvironmentVariables {
   GOOGLE_CLIENT_SECRET: string;
   GOOGLE_CALLBACK_URL: string;
   GOOGLE_FRONTEND_REDIRECT_URL: string;
+  PASSWORD_RESET_OTP_TTL: string;
 }
 
 export const envValidationSchema = Joi.object<EnvironmentVariables>({
@@ -41,9 +42,15 @@ export const envValidationSchema = Joi.object<EnvironmentVariables>({
   DB_PASSWORD: Joi.string().required(),
   DB_NAME: Joi.string().required(),
   JWT_SECRET: Joi.string().required(),
-  JWT_EXPIRES_IN: Joi.number().positive().required(),
+  JWT_EXPIRES_IN: Joi.string()
+    .trim()
+    .regex(/^\d+(\s*[smhd](\s+\d+\s*[smhd])*)?$/i, 'duration')
+    .required(),
   JWT_REFRESH_SECRET: Joi.string().required(),
-  JWT_REFRESH_EXPIRES_IN: Joi.number().positive().required(),
+  JWT_REFRESH_EXPIRES_IN: Joi.string()
+    .trim()
+    .regex(/^\d+(\s*[smhd](\s+\d+\s*[smhd])*)?$/i, 'duration')
+    .required(),
   REDIS_HOST: Joi.string().required(),
   REDIS_PORT: Joi.number().port().required(),
   REDIS_USERNAME: Joi.string().optional(),
@@ -58,4 +65,8 @@ export const envValidationSchema = Joi.object<EnvironmentVariables>({
   GOOGLE_CLIENT_SECRET: Joi.string().required(),
   GOOGLE_CALLBACK_URL: Joi.string().uri().required(),
   GOOGLE_FRONTEND_REDIRECT_URL: Joi.string().uri().required(),
+  PASSWORD_RESET_OTP_TTL: Joi.string()
+    .trim()
+    .regex(/^\d+(\s*[smhd](\s+\d+\s*[smhd])*)?$/i, 'duration')
+    .default('10m'),
 });

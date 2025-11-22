@@ -15,8 +15,6 @@ async function bootstrap() {
   const reflector = app.get(Reflector);
   const appConfigService = app.get(AppConfigService);
 
-  console.log('CORS origins:', appConfigService.corsOrigins);
-
   app.use(helmet());
   app.use(cookieParser());
   app.enableCors({
@@ -46,7 +44,6 @@ async function bootstrap() {
   }
 
   await app.listen(process.env.PORT ?? 3000);
-  console.log(`🚀 Server running on port ${process.env.PORT ?? 3000}`);
 }
 
 void bootstrap();

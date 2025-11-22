@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from './env.validation';
+import { parseDurationToSeconds } from '../common/algorithms/duration.util';
 
 @Injectable()
 export class AppConfigService {
@@ -38,18 +39,22 @@ export class AppConfigService {
   }
 
   getJwtConfig() {
+    const expiresInSeconds = parseDurationToSeconds(
+      this.configService.getOrThrow<string>('JWT_EXPIRES_IN'),
+    );
     return {
       secret: this.configService.getOrThrow<string>('JWT_SECRET'),
-      expiresIn: this.configService.getOrThrow<number>('JWT_EXPIRES_IN'),
+      expiresInSeconds,
     };
   }
 
   getJwtRefreshConfig() {
+    const expiresInSeconds = parseDurationToSeconds(
+      this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRES_IN'),
+    );
     return {
       secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
-      expiresIn: this.configService.getOrThrow<number>(
-        'JWT_REFRESH_EXPIRES_IN',
-      ),
+      expiresInSeconds,
     };
   }
 
@@ -82,6 +87,16 @@ export class AppConfigService {
       user: this.configService.getOrThrow<string>('MAIL_USER'),
       password: this.configService.getOrThrow<string>('MAIL_PASSWORD'),
       from: this.configService.getOrThrow<string>('MAIL_FROM'),
+    };
+  }
+
+  getPasswordResetConfig() {
+    const ttlValue = this.configService.getOrThrow<string>(
+      'PASSWORD_RESET_OTP_TTL',
+    );
+
+    return {
+      otpTtlSeconds: parseDurationToSeconds(ttlValue),
     };
   }
 }

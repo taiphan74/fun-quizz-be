@@ -20,7 +20,7 @@ export class JwtTokenService {
   ) {
     const refreshConfig = this.configService.getJwtRefreshConfig();
     this.refreshTokenSecret = refreshConfig.secret;
-    this.refreshTokenExpiresInSeconds = refreshConfig.expiresIn;
+    this.refreshTokenExpiresInSeconds = refreshConfig.expiresInSeconds;
   }
 
   generateAccessToken(user: JwtSource): string {

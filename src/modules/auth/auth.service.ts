@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import type { Profile } from 'passport-google-oauth20';
-import type { User } from '@prisma/client';
+import { AuthProviderType, type User } from '@prisma/client';
 import { UsersService } from '../users/users.service';
 import { UserRole } from '../users/user-role.enum';
 import {
@@ -19,24 +19,32 @@ import { RedisService } from '../../common/redis/redis.service';
 import { JwtPayload } from './types/jwt-payload.interface';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { AppConfigService } from '../../config/app-config.service';
+import { generateNumericOtp } from '../../common/algorithms/otp.util';
 
 interface GoogleAccountPayload {
   email?: string | null;
   givenName?: string | null;
   familyName?: string | null;
+  providerAccountId?: string | null;
 }
 
 @Injectable()
 export class AuthService {
   private readonly refreshTokenKeyPrefix = 'refresh-token';
   private readonly resetOtpKeyPrefix = 'password-reset-otp';
+  private readonly passwordResetOtpTtlSeconds: number;
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtTokenService: JwtTokenService,
     private readonly redisService: RedisService,
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
-  ) {}
+    private readonly appConfigService: AppConfigService,
+  ) {
+    this.passwordResetOtpTtlSeconds =
+      this.appConfigService.getPasswordResetConfig().otpTtlSeconds;
+  }
 
   async login(
     loginDto: LoginDto,
@@ -56,6 +64,7 @@ export class AuthService {
     const userResponse = toUserResponse(user);
     const accessToken = this.jwtTokenService.generateAccessToken(user);
     const refreshToken = this.jwtTokenService.generateRefreshToken(user);
+    await this.ensureAuthProviderExists(user.id, AuthProviderType.LOCAL);
     await this.storeRefreshToken(user.id, refreshToken);
     return { user: userResponse, accessToken, refreshToken };
   }
@@ -67,6 +76,7 @@ export class AuthService {
       email: profile.emails?.[0]?.value,
       givenName: profile.name?.givenName,
       familyName: profile.name?.familyName,
+      providerAccountId: profile.id,
     });
   }
 
@@ -120,9 +130,12 @@ export class AuthService {
       return { message: 'If the email exists, an OTP has been sent' };
     }
 
-    const otp = this.generateOtp();
-    const ttlSeconds = 10 * 60; // 10 minutes
-    await this.redisService.set(this.getResetOtpKey(email), otp, ttlSeconds);
+    const otp = generateNumericOtp();
+    await this.redisService.set(
+      this.getResetOtpKey(email),
+      otp,
+      this.passwordResetOtpTtlSeconds,
+    );
     await this.mailService.sendOtpEmail(email, otp);
 
     return { message: 'OTP sent to email' };
@@ -167,17 +180,33 @@ export class AuthService {
     return `${this.resetOtpKeyPrefix}:${email}`;
   }
 
-  private generateOtp(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
-
   private async findOrCreateGoogleUser(
     payload: GoogleAccountPayload,
   ): Promise<User> {
     const email = payload.email;
+    const providerAccountId = payload.providerAccountId;
 
     if (!email) {
       throw new UnauthorizedException('Google account is missing an email');
+    }
+
+    if (providerAccountId) {
+      const provider = await this.prisma.authProvider.findFirst({
+        where: {
+          provider: AuthProviderType.GOOGLE,
+          providerAccountId,
+        },
+        include: { user: true },
+      });
+      if (provider?.user) {
+        if (!provider.user.emailVerified) {
+          await this.prisma.user.update({
+            where: { id: provider.user.id },
+            data: { emailVerified: true },
+          });
+        }
+        return provider.user;
+      }
     }
 
     const existingUser = await this.prisma.user.findUnique({
@@ -185,21 +214,46 @@ export class AuthService {
     });
 
     if (existingUser) {
+      const updateEmailVerified = !existingUser.emailVerified;
+      await this.ensureAuthProviderExists(
+        existingUser.id,
+        AuthProviderType.GOOGLE,
+        providerAccountId,
+      );
+      if (updateEmailVerified) {
+        await this.prisma.user.update({
+          where: { id: existingUser.id },
+          data: { emailVerified: true },
+        });
+      }
       return existingUser;
     }
 
     const username = await this.generateUniqueUsername(email);
     const hashPassword = await bcrypt.hash(this.generateRandomPassword(), 10);
 
-    return this.prisma.user.create({
-      data: {
-        email,
-        username,
-        firstName: payload.givenName ?? '',
-        lastName: payload.familyName ?? '',
-        role: UserRole.USER,
-        hashPassword,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email,
+          username,
+          firstName: payload.givenName ?? '',
+          lastName: payload.familyName ?? '',
+          role: UserRole.USER,
+          hashPassword,
+          emailVerified: true,
+        },
+      });
+
+      await tx.authProvider.create({
+        data: {
+          userId: createdUser.id,
+          provider: AuthProviderType.GOOGLE,
+          providerAccountId,
+        },
+      });
+
+      return createdUser;
     });
   }
 
@@ -223,5 +277,36 @@ export class AuthService {
 
   private generateRandomPassword(): string {
     return randomBytes(24).toString('hex');
+  }
+
+  private async ensureAuthProviderExists(
+    userId: string,
+    provider: AuthProviderType,
+    providerAccountId?: string | null,
+  ): Promise<void> {
+    const existingProvider = await this.prisma.authProvider.findFirst({
+      where: { userId, provider },
+    });
+
+    if (existingProvider) {
+      if (
+        providerAccountId &&
+        !existingProvider.providerAccountId
+      ) {
+        await this.prisma.authProvider.update({
+          where: { id: existingProvider.id },
+          data: { providerAccountId },
+        });
+      }
+      return;
+    }
+
+    await this.prisma.authProvider.create({
+      data: {
+        userId,
+        provider,
+        providerAccountId: providerAccountId ?? undefined,
+      },
+    });
   }
 }
