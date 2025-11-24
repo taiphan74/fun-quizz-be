@@ -14,7 +14,6 @@ import {
   AccessTokenResponseDto,
   AuthResponseDto,
   LoginDto,
-  RefreshTokenDto,
   RegisterDto,
   EmailRequestDto,
   VerifyResetOtpDto,
@@ -22,9 +21,8 @@ import {
   VerifyEmailOtpDto,
 } from './auth.dto';
 import { GoogleOAuthGuard } from './guards/google-auth.guard';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import type { Profile } from 'passport-google-oauth20';
-import type { Response } from 'express';
 import { AppConfigService } from '../../config/app-config.service';
 
 @ApiTags('auth')
@@ -44,9 +42,8 @@ export class AuthController {
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto> {
-    const { refreshToken, ...response } = await this.authService.login(
-      loginDto,
-    );
+    const { refreshToken, ...response } =
+      await this.authService.login(loginDto);
     this.authService.setRefreshTokenCookie(res, refreshToken);
     return response;
   }
@@ -64,10 +61,10 @@ export class AuthController {
       'Redirects to frontend with access token appended as a query param',
   })
   async googleAuthCallback(
-    @Req() req: Request,
+    @Req() req: Request & { user?: Profile },
     @Res() res: Response,
   ): Promise<void> {
-    const profile = req.user as Profile | undefined;
+    const profile = req.user;
     if (!profile) {
       throw new UnauthorizedException('Google authentication failed');
     }
@@ -88,9 +85,8 @@ export class AuthController {
     @Body() registerDto: RegisterDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto> {
-    const { refreshToken, ...response } = await this.authService.register(
-      registerDto,
-    );
+    const { refreshToken, ...response } =
+      await this.authService.register(registerDto);
     this.authService.setRefreshTokenCookie(res, refreshToken);
     return response;
   }
@@ -105,7 +101,7 @@ export class AuthController {
       .cookies;
     const refreshToken = cookies?.refreshToken;
     // Debug: log refresh token from cookies
-    // eslint-disable-next-line no-console
+
     console.log('Refresh token from cookies:', refreshToken);
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token is missing');
@@ -127,12 +123,12 @@ export class AuthController {
     @Body() verifyResetOtpDto: VerifyResetOtpDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ message: string; expiresInSeconds: number }> {
-    return this.authService.verifyPasswordResetOtp(verifyResetOtpDto).then(
-      ({ message, resetToken, expiresInSeconds }) => {
+    return this.authService
+      .verifyPasswordResetOtp(verifyResetOtpDto)
+      .then(({ message, resetToken, expiresInSeconds }) => {
         this.authService.setResetTokenCookie(res, resetToken, expiresInSeconds);
         return { message, expiresInSeconds };
-      },
-    );
+      });
   }
 
   @Post('reset-password')
@@ -155,7 +151,9 @@ export class AuthController {
   requestEmailVerification(
     @Body() forgotPasswordDto: EmailRequestDto,
   ): Promise<{ message: string }> {
-    return this.authService.requestEmailVerificationOtp(forgotPasswordDto.email);
+    return this.authService.requestEmailVerificationOtp(
+      forgotPasswordDto.email,
+    );
   }
 
   @Post('verify-email-otp')

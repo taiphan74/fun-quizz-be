@@ -36,7 +36,7 @@ export class RolesGuard implements CanActivate {
 
     if (!requiredRoles.includes(user.role)) {
       // Debug log to inspect which routes are failing role checks
-      // eslint-disable-next-line no-console
+
       console.log(
         'RolesGuard blocked request',
         JSON.stringify({

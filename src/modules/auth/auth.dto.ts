@@ -4,10 +4,13 @@ import {
   IsNotEmpty,
   IsString,
   Length,
-  IsOptional,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { CreateUserDto, UserResponseDto } from '../users/user.dto';
+
+const normalizeEmail = (value: unknown): string =>
+  typeof value === 'string' ? value.trim().toLowerCase() : '';
 
 export class LoginDto {
   @ApiProperty({
@@ -34,6 +37,7 @@ export class RegisterDto
   @ApiProperty({ example: 'john@example.com', description: 'User email' })
   @IsEmail()
   @IsNotEmpty()
+  @Transform(({ value }) => normalizeEmail(value))
   email: string;
 
   @ApiProperty({ example: 'secret123', minLength: 6 })
@@ -76,6 +80,7 @@ export class EmailRequestDto {
   })
   @IsEmail()
   @IsNotEmpty()
+  @Transform(({ value }) => normalizeEmail(value))
   email: string;
 }
 
@@ -86,6 +91,7 @@ export class VerifyResetOtpDto {
   })
   @IsEmail()
   @IsNotEmpty()
+  @Transform(({ value }) => normalizeEmail(value))
   email: string;
 
   @ApiProperty({ description: 'OTP received via email', example: '123456' })
@@ -110,6 +116,7 @@ export class VerifyEmailOtpDto {
   })
   @IsEmail()
   @IsNotEmpty()
+  @Transform(({ value }) => normalizeEmail(value))
   email: string;
 
   @ApiProperty({ description: 'OTP sent to the email', example: '123456' })

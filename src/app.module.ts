@@ -8,7 +8,7 @@ import { AnswersModule } from './modules/answers/answers.module';
 import { RedisModule } from './common/redis/redis.module';
 import { AppConfigModule } from './config/app-config.module';
 import { PrismaModule } from './common/prisma/prisma.module';
-import { MailModule } from './modules/mail/mail.module';
+import { MailModule } from './common/mail/mail.module';
 
 @Module({
   imports: [

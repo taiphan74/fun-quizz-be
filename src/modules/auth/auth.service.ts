@@ -17,19 +17,17 @@ import {
   VerifyEmailOtpDto,
 } from './auth.dto';
 import { toUserResponse } from '../users/user.mapper';
-import { JwtTokenService } from './jwt-token.service';
+import { JwtTokenService } from './services/jwt-token.service';
 import { RedisService } from '../../common/redis/redis.service';
-import { JwtPayload } from './types/jwt-payload.interface';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { MailService } from '../mail/mail.service';
 import { AppConfigService } from '../../config/app-config.service';
-import { generateNumericOtp } from '../../common/algorithms/otp.util';
 import type { Response } from 'express';
 import { GoogleAuthService } from './google-auth.service';
+import { OtpService } from '../otp/otp.service';
+import { RefreshTokenStore } from './services/refresh-token.store';
 
 @Injectable()
 export class AuthService {
-  private readonly refreshTokenKeyPrefix = 'refresh-token';
   private readonly resetOtpKeyPrefix = 'password-reset-otp';
   private readonly resetTokenKeyPrefix = 'password-reset-token';
   private readonly resetTokenTtlSeconds = 5 * 60; // 5 minutes
@@ -40,9 +38,10 @@ export class AuthService {
     private readonly jwtTokenService: JwtTokenService,
     private readonly redisService: RedisService,
     private readonly prisma: PrismaService,
-    private readonly mailService: MailService,
     private readonly appConfigService: AppConfigService,
     private readonly googleAuthService: GoogleAuthService,
+    private readonly otpService: OtpService,
+    private readonly refreshTokenStore: RefreshTokenStore,
   ) {
     this.passwordResetOtpTtlSeconds =
       this.appConfigService.getPasswordResetConfig().otpTtlSeconds;
@@ -65,9 +64,16 @@ export class AuthService {
 
     const userResponse = toUserResponse(user);
     const accessToken = this.jwtTokenService.generateAccessToken(user);
-    const refreshToken = this.jwtTokenService.generateRefreshToken(user);
+    const refreshToken = this.refreshTokenStore.generateToken();
     await this.ensureAuthProviderExists(user.id, AuthProviderType.LOCAL);
-    await this.storeRefreshToken(user.id, refreshToken);
+    await this.refreshTokenStore.save(user.id, refreshToken);
+    if (!user.emailVerified) {
+      await this.otpService.sendEmailVerificationOtp(
+        this.getVerifyEmailOtpKey(user.email),
+        user.email,
+        this.passwordResetOtpTtlSeconds,
+      );
+    }
     return { user: userResponse, accessToken, refreshToken };
   }
 
@@ -77,8 +83,8 @@ export class AuthService {
     const user = await this.googleAuthService.loginWithGoogleProfile(profile);
     const userResponse = toUserResponse(user);
     const accessToken = this.jwtTokenService.generateAccessToken(user);
-    const refreshToken = this.jwtTokenService.generateRefreshToken(user);
-    await this.storeRefreshToken(user.id, refreshToken);
+    const refreshToken = this.refreshTokenStore.generateToken();
+    await this.refreshTokenStore.save(user.id, refreshToken);
     return { user: userResponse, accessToken, refreshToken };
   }
 
@@ -90,8 +96,13 @@ export class AuthService {
       role: UserRole.USER,
     });
     const accessToken = this.jwtTokenService.generateAccessToken(user);
-    const refreshToken = this.jwtTokenService.generateRefreshToken(user);
-    await this.storeRefreshToken(user.id, refreshToken);
+    const refreshToken = this.refreshTokenStore.generateToken();
+    await this.refreshTokenStore.save(user.id, refreshToken);
+    await this.otpService.sendEmailVerificationOtp(
+      this.getVerifyEmailOtpKey(user.email),
+      user.email,
+      this.passwordResetOtpTtlSeconds,
+    );
     return { user, accessToken, refreshToken };
   }
 
@@ -99,25 +110,30 @@ export class AuthService {
     refreshTokenDto: RefreshTokenDto,
   ): Promise<AccessTokenResponseDto> {
     const { refreshToken } = refreshTokenDto;
-    const payload = this.verifyRefreshToken(refreshToken);
+    const userId = await this.refreshTokenStore.getUserIdByToken(refreshToken);
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
     const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
+      where: { id: userId },
     });
 
     if (!user) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const storedRefreshToken = await this.redisService.get(
-      this.getRefreshTokenKey(user.id),
+    const latestToken = await this.refreshTokenStore.getLatestTokenForUser(
+      user.id,
     );
 
-    if (!storedRefreshToken || storedRefreshToken !== refreshToken) {
+    if (!latestToken || latestToken !== refreshToken) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
     const accessToken = this.jwtTokenService.generateAccessToken(user);
-    await this.storeRefreshToken(user.id, refreshToken);
+    await this.refreshTokenStore.save(user.id, refreshToken);
 
     return { accessToken };
   }
@@ -125,20 +141,18 @@ export class AuthService {
   async requestPasswordReset(
     forgotPasswordDto: EmailRequestDto,
   ): Promise<{ message: string }> {
-    const email = forgotPasswordDto.email.trim().toLowerCase();
+    const email = forgotPasswordDto.email;
     const user = await this.prisma.user.findUnique({ where: { email } });
 
     if (!user) {
       return { message: 'If the email exists, an OTP has been sent' };
     }
 
-    const otp = generateNumericOtp();
-    await this.redisService.set(
+    await this.otpService.sendPasswordResetOtp(
       this.getResetOtpKey(email),
-      otp,
+      email,
       this.passwordResetOtpTtlSeconds,
     );
-    await this.mailService.sendOtpEmail(email, otp);
 
     return { message: 'OTP sent to email' };
   }
@@ -146,7 +160,7 @@ export class AuthService {
   async requestEmailVerificationOtp(
     email: string,
   ): Promise<{ message: string }> {
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = email;
     const user = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
     });
@@ -159,13 +173,11 @@ export class AuthService {
       return { message: 'Email already verified' };
     }
 
-    const otp = generateNumericOtp();
-    await this.redisService.set(
+    await this.otpService.sendEmailVerificationOtp(
       this.getVerifyEmailOtpKey(normalizedEmail),
-      otp,
+      normalizedEmail,
       this.passwordResetOtpTtlSeconds,
     );
-    await this.mailService.sendEmailVerificationOtp(normalizedEmail, otp);
 
     return { message: 'Verification OTP sent to email' };
   }
@@ -173,9 +185,9 @@ export class AuthService {
   async verifyEmailOtp(
     verifyEmailOtpDto: VerifyEmailOtpDto,
   ): Promise<{ message: string }> {
-    const email = verifyEmailOtpDto.email.trim().toLowerCase();
+    const email = verifyEmailOtpDto.email;
     const otp = verifyEmailOtpDto.otp.trim();
-    const storedOtp = await this.redisService.get(
+    const storedOtp = await this.otpService.getOtp(
       this.getVerifyEmailOtpKey(email),
     );
 
@@ -187,17 +199,19 @@ export class AuthService {
       where: { email },
       data: { emailVerified: true },
     });
-    await this.redisService.delete(this.getVerifyEmailOtpKey(email));
+    await this.otpService.deleteOtp(this.getVerifyEmailOtpKey(email));
 
     return { message: 'Email verified successfully' };
   }
 
-  async verifyPasswordResetOtp(
-    verifyResetOtpDto: VerifyResetOtpDto,
-  ): Promise<{ message: string; resetToken: string; expiresInSeconds: number }> {
-    const email = verifyResetOtpDto.email.trim().toLowerCase();
+  async verifyPasswordResetOtp(verifyResetOtpDto: VerifyResetOtpDto): Promise<{
+    message: string;
+    resetToken: string;
+    expiresInSeconds: number;
+  }> {
+    const email = verifyResetOtpDto.email;
     const otp = verifyResetOtpDto.otp.trim();
-    const storedOtp = await this.redisService.get(this.getResetOtpKey(email));
+    const storedOtp = await this.otpService.getOtp(this.getResetOtpKey(email));
 
     if (!storedOtp || storedOtp !== otp) {
       throw new UnauthorizedException('Invalid or expired OTP');
@@ -210,7 +224,7 @@ export class AuthService {
       this.resetTokenTtlSeconds,
     );
     // Delete OTP after successful verification to prevent reuse
-    await this.redisService.delete(this.getResetOtpKey(email));
+    await this.otpService.deleteOtp(this.getResetOtpKey(email));
 
     return {
       message: 'OTP verified. Use reset token to update password',
@@ -251,30 +265,6 @@ export class AuthService {
     await this.redisService.delete(this.getResetTokenKey(token));
 
     return { message: 'Password has been reset' };
-  }
-
-  private getRefreshTokenKey(userId: string): string {
-    return `${this.refreshTokenKeyPrefix}:${userId}`;
-  }
-
-  private async storeRefreshToken(
-    userId: string,
-    refreshToken: string,
-  ): Promise<void> {
-    const ttl = this.jwtTokenService.getRefreshTokenTtlSeconds();
-    await this.redisService.set(
-      this.getRefreshTokenKey(userId),
-      refreshToken,
-      ttl,
-    );
-  }
-
-  private verifyRefreshToken(refreshToken: string): JwtPayload {
-    try {
-      return this.jwtTokenService.verifyRefreshToken(refreshToken);
-    } catch {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
   }
 
   private getResetOtpKey(email: string): string {
@@ -326,10 +316,7 @@ export class AuthService {
     });
 
     if (existingProvider) {
-      if (
-        providerAccountId &&
-        !existingProvider.providerAccountId
-      ) {
+      if (providerAccountId && !existingProvider.providerAccountId) {
         await this.prisma.authProvider.update({
           where: { id: existingProvider.id },
           data: { providerAccountId },

@@ -13,4 +13,3 @@ export class FilteredLogger extends ConsoleLogger {
     super.error(message, stack, context);
   }
 }
-

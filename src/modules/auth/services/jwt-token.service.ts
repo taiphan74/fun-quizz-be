@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { JwtPayload } from './types/jwt-payload.interface';
+import { JwtPayload } from '../types/jwt-payload.interface';
 import type { User } from '@prisma/client';
-import { UserResponseDto } from '../users/user.dto';
-import { AppConfigService } from '../../config/app-config.service';
+import { UserResponseDto } from '../../users/user.dto';
+import { AppConfigService } from '../../../config/app-config.service';
 
 type JwtSource =
   | Pick<User, 'id' | 'username' | 'email' | 'role'>
@@ -11,7 +11,6 @@ type JwtSource =
 
 @Injectable()
 export class JwtTokenService {
-  private readonly refreshTokenSecret: string;
   private readonly refreshTokenExpiresInSeconds: number;
 
   constructor(
@@ -19,27 +18,12 @@ export class JwtTokenService {
     private readonly configService: AppConfigService,
   ) {
     const refreshConfig = this.configService.getJwtRefreshConfig();
-    this.refreshTokenSecret = refreshConfig.secret;
     this.refreshTokenExpiresInSeconds = refreshConfig.expiresInSeconds;
   }
 
   generateAccessToken(user: JwtSource): string {
     const payload = this.buildPayload(user);
     return this.jwtService.sign(payload);
-  }
-
-  generateRefreshToken(user: JwtSource): string {
-    const payload = this.buildPayload(user);
-    return this.jwtService.sign(payload, {
-      secret: this.refreshTokenSecret,
-      expiresIn: this.refreshTokenExpiresInSeconds,
-    });
-  }
-
-  verifyRefreshToken(token: string): JwtPayload {
-    return this.jwtService.verify<JwtPayload>(token, {
-      secret: this.refreshTokenSecret,
-    });
   }
 
   getRefreshTokenTtlSeconds(): number {
