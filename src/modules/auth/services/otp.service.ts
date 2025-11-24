@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { RedisService } from '../../common/redis/redis.service';
-import { generateNumericOtp } from '../../common/algorithms/otp.util';
-import { MailService } from '../../common/mail/mail.service';
+import { RedisService } from '../../../common/redis/redis.service';
+import { generateNumericOtp } from '../../../common/algorithms/otp.util';
+import { MailService } from '../../../common/mail/mail.service';
 
 @Injectable()
 export class OtpService {

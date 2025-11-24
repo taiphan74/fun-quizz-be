@@ -11,14 +11,15 @@ import { RolesGuard } from './guards/roles.guard';
 import { AppConfigService } from '../../config/app-config.service';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { GoogleOAuthGuard } from './guards/google-auth.guard';
-import { GoogleAuthService } from './google-auth.service';
-import { OtpModule } from '../otp/otp.module';
+import { OtpService } from './services/otp.service';
 import { RefreshTokenStore } from './services/refresh-token.store';
+import { GoogleAuthService } from './services/google-auth.service';
+import { MailModule } from '../../common/mail/mail.module';
 
 @Module({
   imports: [
     UsersModule,
-    OtpModule,
+    MailModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       inject: [AppConfigService],
@@ -43,6 +44,7 @@ import { RefreshTokenStore } from './services/refresh-token.store';
     GoogleStrategy,
     GoogleOAuthGuard,
     GoogleAuthService,
+    OtpService,
     RefreshTokenStore,
   ],
   exports: [

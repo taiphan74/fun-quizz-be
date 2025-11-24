@@ -3,7 +3,6 @@ import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from '../types/jwt-payload.interface';
 import type { User } from '@prisma/client';
 import { UserResponseDto } from '../../users/user.dto';
-import { AppConfigService } from '../../../config/app-config.service';
 
 type JwtSource =
   | Pick<User, 'id' | 'username' | 'email' | 'role'>
@@ -11,23 +10,11 @@ type JwtSource =
 
 @Injectable()
 export class JwtTokenService {
-  private readonly refreshTokenExpiresInSeconds: number;
-
-  constructor(
-    private readonly jwtService: JwtService,
-    private readonly configService: AppConfigService,
-  ) {
-    const refreshConfig = this.configService.getJwtRefreshConfig();
-    this.refreshTokenExpiresInSeconds = refreshConfig.expiresInSeconds;
-  }
+  constructor(private readonly jwtService: JwtService) {}
 
   generateAccessToken(user: JwtSource): string {
     const payload = this.buildPayload(user);
     return this.jwtService.sign(payload);
-  }
-
-  getRefreshTokenTtlSeconds(): number {
-    return this.refreshTokenExpiresInSeconds;
   }
 
   private buildPayload(user: JwtSource): JwtPayload {

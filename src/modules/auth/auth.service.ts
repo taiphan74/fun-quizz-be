@@ -22,8 +22,8 @@ import { RedisService } from '../../common/redis/redis.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AppConfigService } from '../../config/app-config.service';
 import type { Response } from 'express';
-import { GoogleAuthService } from './google-auth.service';
-import { OtpService } from '../otp/otp.service';
+import { GoogleAuthService } from './services/google-auth.service';
+import { OtpService } from './services/otp.service';
 import { RefreshTokenStore } from './services/refresh-token.store';
 
 @Injectable()
@@ -58,22 +58,15 @@ export class AuthService {
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.hashPassword);
+
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const userResponse = toUserResponse(user);
     const accessToken = this.jwtTokenService.generateAccessToken(user);
-    const refreshToken = this.refreshTokenStore.generateToken();
+    const refreshToken = await this.refreshTokenStore.issueForUser(user.id);
     await this.ensureAuthProviderExists(user.id, AuthProviderType.LOCAL);
-    await this.refreshTokenStore.save(user.id, refreshToken);
-    if (!user.emailVerified) {
-      await this.otpService.sendEmailVerificationOtp(
-        this.getVerifyEmailOtpKey(user.email),
-        user.email,
-        this.passwordResetOtpTtlSeconds,
-      );
-    }
     return { user: userResponse, accessToken, refreshToken };
   }
 
@@ -83,8 +76,7 @@ export class AuthService {
     const user = await this.googleAuthService.loginWithGoogleProfile(profile);
     const userResponse = toUserResponse(user);
     const accessToken = this.jwtTokenService.generateAccessToken(user);
-    const refreshToken = this.refreshTokenStore.generateToken();
-    await this.refreshTokenStore.save(user.id, refreshToken);
+    const refreshToken = await this.refreshTokenStore.issueForUser(user.id);
     return { user: userResponse, accessToken, refreshToken };
   }
 
@@ -96,13 +88,7 @@ export class AuthService {
       role: UserRole.USER,
     });
     const accessToken = this.jwtTokenService.generateAccessToken(user);
-    const refreshToken = this.refreshTokenStore.generateToken();
-    await this.refreshTokenStore.save(user.id, refreshToken);
-    await this.otpService.sendEmailVerificationOtp(
-      this.getVerifyEmailOtpKey(user.email),
-      user.email,
-      this.passwordResetOtpTtlSeconds,
-    );
+    const refreshToken = await this.refreshTokenStore.issueForUser(user.id);
     return { user, accessToken, refreshToken };
   }
 
@@ -133,7 +119,7 @@ export class AuthService {
     }
 
     const accessToken = this.jwtTokenService.generateAccessToken(user);
-    await this.refreshTokenStore.save(user.id, refreshToken);
+    await this.refreshTokenStore.storeForUser(user.id, refreshToken);
 
     return { accessToken };
   }

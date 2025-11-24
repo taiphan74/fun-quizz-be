@@ -3,8 +3,8 @@ import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import type { Profile } from 'passport-google-oauth20';
 import { AuthProviderType, type User } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { UserRole } from '../users/user-role.enum';
+import { PrismaService } from '../../../common/prisma/prisma.service';
+import { UserRole } from '../../users/user-role.enum';
 
 interface GoogleAccountPayload {
   email?: string | null;
