@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import type { Profile } from 'passport-google-oauth20';
-import { AuthProviderType, type User } from '@prisma/client';
+import { AuthProviderType } from '@prisma/client';
 import { UsersService } from '../users/users.service';
 import { UserRole } from '../users/user-role.enum';
 import {
@@ -11,7 +11,10 @@ import {
   LoginDto,
   RefreshTokenDto,
   RegisterDto,
-  ForgotPasswordDto,
+  EmailRequestDto,
+  VerifyResetOtpDto,
+  ResetPasswordDto,
+  VerifyEmailOtpDto,
 } from './auth.dto';
 import { toUserResponse } from '../users/user.mapper';
 import { JwtTokenService } from './jwt-token.service';
@@ -21,18 +24,16 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { AppConfigService } from '../../config/app-config.service';
 import { generateNumericOtp } from '../../common/algorithms/otp.util';
-
-interface GoogleAccountPayload {
-  email?: string | null;
-  givenName?: string | null;
-  familyName?: string | null;
-  providerAccountId?: string | null;
-}
+import type { Response } from 'express';
+import { GoogleAuthService } from './google-auth.service';
 
 @Injectable()
 export class AuthService {
   private readonly refreshTokenKeyPrefix = 'refresh-token';
   private readonly resetOtpKeyPrefix = 'password-reset-otp';
+  private readonly resetTokenKeyPrefix = 'password-reset-token';
+  private readonly resetTokenTtlSeconds = 5 * 60; // 5 minutes
+  private readonly verifyEmailOtpKeyPrefix = 'verify-email-otp';
   private readonly passwordResetOtpTtlSeconds: number;
   constructor(
     private readonly usersService: UsersService,
@@ -41,6 +42,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     private readonly appConfigService: AppConfigService,
+    private readonly googleAuthService: GoogleAuthService,
   ) {
     this.passwordResetOtpTtlSeconds =
       this.appConfigService.getPasswordResetConfig().otpTtlSeconds;
@@ -72,12 +74,12 @@ export class AuthService {
   async loginWithGoogleProfile(
     profile: Profile,
   ): Promise<AuthResponseDto & { refreshToken: string }> {
-    return this.authenticateGoogleAccount({
-      email: profile.emails?.[0]?.value,
-      givenName: profile.name?.givenName,
-      familyName: profile.name?.familyName,
-      providerAccountId: profile.id,
-    });
+    const user = await this.googleAuthService.loginWithGoogleProfile(profile);
+    const userResponse = toUserResponse(user);
+    const accessToken = this.jwtTokenService.generateAccessToken(user);
+    const refreshToken = this.jwtTokenService.generateRefreshToken(user);
+    await this.storeRefreshToken(user.id, refreshToken);
+    return { user: userResponse, accessToken, refreshToken };
   }
 
   async register(
@@ -121,7 +123,7 @@ export class AuthService {
   }
 
   async requestPasswordReset(
-    forgotPasswordDto: ForgotPasswordDto,
+    forgotPasswordDto: EmailRequestDto,
   ): Promise<{ message: string }> {
     const email = forgotPasswordDto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email } });
@@ -141,15 +143,114 @@ export class AuthService {
     return { message: 'OTP sent to email' };
   }
 
-  private async authenticateGoogleAccount(
-    payload: GoogleAccountPayload,
-  ): Promise<AuthResponseDto & { refreshToken: string }> {
-    const user = await this.findOrCreateGoogleUser(payload);
-    const userResponse = toUserResponse(user);
-    const accessToken = this.jwtTokenService.generateAccessToken(user);
-    const refreshToken = this.jwtTokenService.generateRefreshToken(user);
-    await this.storeRefreshToken(user.id, refreshToken);
-    return { user: userResponse, accessToken, refreshToken };
+  async requestEmailVerificationOtp(
+    email: string,
+  ): Promise<{ message: string }> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      return { message: 'If the email exists, an OTP has been sent' };
+    }
+
+    if (user.emailVerified) {
+      return { message: 'Email already verified' };
+    }
+
+    const otp = generateNumericOtp();
+    await this.redisService.set(
+      this.getVerifyEmailOtpKey(normalizedEmail),
+      otp,
+      this.passwordResetOtpTtlSeconds,
+    );
+    await this.mailService.sendEmailVerificationOtp(normalizedEmail, otp);
+
+    return { message: 'Verification OTP sent to email' };
+  }
+
+  async verifyEmailOtp(
+    verifyEmailOtpDto: VerifyEmailOtpDto,
+  ): Promise<{ message: string }> {
+    const email = verifyEmailOtpDto.email.trim().toLowerCase();
+    const otp = verifyEmailOtpDto.otp.trim();
+    const storedOtp = await this.redisService.get(
+      this.getVerifyEmailOtpKey(email),
+    );
+
+    if (!storedOtp || storedOtp !== otp) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    await this.prisma.user.update({
+      where: { email },
+      data: { emailVerified: true },
+    });
+    await this.redisService.delete(this.getVerifyEmailOtpKey(email));
+
+    return { message: 'Email verified successfully' };
+  }
+
+  async verifyPasswordResetOtp(
+    verifyResetOtpDto: VerifyResetOtpDto,
+  ): Promise<{ message: string; resetToken: string; expiresInSeconds: number }> {
+    const email = verifyResetOtpDto.email.trim().toLowerCase();
+    const otp = verifyResetOtpDto.otp.trim();
+    const storedOtp = await this.redisService.get(this.getResetOtpKey(email));
+
+    if (!storedOtp || storedOtp !== otp) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    const resetToken = randomBytes(32).toString('hex');
+    await this.redisService.set(
+      this.getResetTokenKey(resetToken),
+      email,
+      this.resetTokenTtlSeconds,
+    );
+    // Delete OTP after successful verification to prevent reuse
+    await this.redisService.delete(this.getResetOtpKey(email));
+
+    return {
+      message: 'OTP verified. Use reset token to update password',
+      resetToken,
+      expiresInSeconds: this.resetTokenTtlSeconds,
+    };
+  }
+
+  async resetPassword(
+    resetPasswordDto: ResetPasswordDto & { resetToken?: string },
+  ): Promise<{ message: string }> {
+    const { resetToken, newPassword } = resetPasswordDto;
+    const token = resetToken ?? '';
+    if (!token) {
+      throw new UnauthorizedException('Reset token is missing');
+    }
+
+    const email = await this.redisService.get<string>(
+      this.getResetTokenKey(token),
+    );
+
+    if (!email) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      throw new UnauthorizedException('Invalid reset token');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { hashPassword: hashedPassword },
+    });
+
+    // Cleanup token to prevent reuse
+    await this.redisService.delete(this.getResetTokenKey(token));
+
+    return { message: 'Password has been reset' };
   }
 
   private getRefreshTokenKey(userId: string): string {
@@ -180,99 +281,35 @@ export class AuthService {
     return `${this.resetOtpKeyPrefix}:${email}`;
   }
 
-  private async findOrCreateGoogleUser(
-    payload: GoogleAccountPayload,
-  ): Promise<User> {
-    const email = payload.email;
-    const providerAccountId = payload.providerAccountId;
+  private getResetTokenKey(token: string): string {
+    return `${this.resetTokenKeyPrefix}:${token}`;
+  }
 
-    if (!email) {
-      throw new UnauthorizedException('Google account is missing an email');
-    }
+  private getVerifyEmailOtpKey(email: string): string {
+    return `${this.verifyEmailOtpKeyPrefix}:${email}`;
+  }
 
-    if (providerAccountId) {
-      const provider = await this.prisma.authProvider.findFirst({
-        where: {
-          provider: AuthProviderType.GOOGLE,
-          providerAccountId,
-        },
-        include: { user: true },
-      });
-      if (provider?.user) {
-        if (!provider.user.emailVerified) {
-          await this.prisma.user.update({
-            where: { id: provider.user.id },
-            data: { emailVerified: true },
-          });
-        }
-        return provider.user;
-      }
-    }
-
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existingUser) {
-      const updateEmailVerified = !existingUser.emailVerified;
-      await this.ensureAuthProviderExists(
-        existingUser.id,
-        AuthProviderType.GOOGLE,
-        providerAccountId,
-      );
-      if (updateEmailVerified) {
-        await this.prisma.user.update({
-          where: { id: existingUser.id },
-          data: { emailVerified: true },
-        });
-      }
-      return existingUser;
-    }
-
-    const username = await this.generateUniqueUsername(email);
-    const hashPassword = await bcrypt.hash(this.generateRandomPassword(), 10);
-
-    return this.prisma.$transaction(async (tx) => {
-      const createdUser = await tx.user.create({
-        data: {
-          email,
-          username,
-          firstName: payload.givenName ?? '',
-          lastName: payload.familyName ?? '',
-          role: UserRole.USER,
-          hashPassword,
-          emailVerified: true,
-        },
-      });
-
-      await tx.authProvider.create({
-        data: {
-          userId: createdUser.id,
-          provider: AuthProviderType.GOOGLE,
-          providerAccountId,
-        },
-      });
-
-      return createdUser;
+  setRefreshTokenCookie(res: Response, refreshToken: string): void {
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: this.appConfigService.nodeEnv === 'production',
+      sameSite: 'lax',
+      path: '/',
     });
   }
 
-  private async generateUniqueUsername(email: string): Promise<string> {
-    const prefix = email.split('@')[0]?.replace(/[^a-zA-Z0-9]/g, '') || 'user';
-    const base = prefix.length > 0 ? prefix.toLowerCase() : 'user';
-    let candidate = base;
-    let attempt = 0;
-
-    while (
-      await this.prisma.user.findUnique({
-        where: { username: candidate },
-      })
-    ) {
-      attempt += 1;
-      candidate = `${base}${attempt}`;
-    }
-
-    return candidate;
+  setResetTokenCookie(
+    res: Response,
+    resetToken: string,
+    ttlSeconds: number,
+  ): void {
+    res.cookie('resetToken', resetToken, {
+      httpOnly: true,
+      secure: this.appConfigService.nodeEnv === 'production',
+      sameSite: 'lax',
+      path: '/auth/reset-password',
+      maxAge: ttlSeconds * 1000,
+    });
   }
 
   private generateRandomPassword(): string {

@@ -16,7 +16,10 @@ import {
   LoginDto,
   RefreshTokenDto,
   RegisterDto,
-  ForgotPasswordDto,
+  EmailRequestDto,
+  VerifyResetOtpDto,
+  ResetPasswordDto,
+  VerifyEmailOtpDto,
 } from './auth.dto';
 import { GoogleOAuthGuard } from './guards/google-auth.guard';
 import type { Request } from 'express';
@@ -44,7 +47,7 @@ export class AuthController {
     const { refreshToken, ...response } = await this.authService.login(
       loginDto,
     );
-    this.setRefreshTokenCookie(res, refreshToken);
+    this.authService.setRefreshTokenCookie(res, refreshToken);
     return response;
   }
 
@@ -70,7 +73,7 @@ export class AuthController {
     }
     const { refreshToken } =
       await this.authService.loginWithGoogleProfile(profile);
-    this.setRefreshTokenCookie(res, refreshToken);
+    this.authService.setRefreshTokenCookie(res, refreshToken);
     const { frontendRedirectUrl } =
       this.appConfigService.getGoogleOAuthConfig();
     res.redirect(frontendRedirectUrl);
@@ -88,7 +91,7 @@ export class AuthController {
     const { refreshToken, ...response } = await this.authService.register(
       registerDto,
     );
-    this.setRefreshTokenCookie(res, refreshToken);
+    this.authService.setRefreshTokenCookie(res, refreshToken);
     return response;
   }
 
@@ -113,17 +116,53 @@ export class AuthController {
   @Post('forgot-password')
   @ApiOkResponse({ description: 'Sends OTP to email if account exists' })
   forgotPassword(
-    @Body() forgotPasswordDto: ForgotPasswordDto,
+    @Body() forgotPasswordDto: EmailRequestDto,
   ): Promise<{ message: string }> {
     return this.authService.requestPasswordReset(forgotPasswordDto);
   }
 
-  private setRefreshTokenCookie(res: Response, refreshToken: string): void {
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: this.appConfigService.nodeEnv === 'production',
-      sameSite: 'lax',
-      path: '/',
+  @Post('verify-reset-otp')
+  @ApiOkResponse({ description: 'Verifies password reset OTP' })
+  verifyResetOtp(
+    @Body() verifyResetOtpDto: VerifyResetOtpDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ message: string; expiresInSeconds: number }> {
+    return this.authService.verifyPasswordResetOtp(verifyResetOtpDto).then(
+      ({ message, resetToken, expiresInSeconds }) => {
+        this.authService.setResetTokenCookie(res, resetToken, expiresInSeconds);
+        return { message, expiresInSeconds };
+      },
+    );
+  }
+
+  @Post('reset-password')
+  @ApiOkResponse({ description: 'Resets password using reset token' })
+  resetPassword(
+    @Body() resetPasswordDto: ResetPasswordDto,
+    @Req() req: Request,
+  ): Promise<{ message: string }> {
+    const cookies = (req as unknown as { cookies?: Record<string, string> })
+      .cookies;
+    const resetToken = cookies?.resetToken || '';
+    return this.authService.resetPassword({
+      ...resetPasswordDto,
+      resetToken,
     });
+  }
+
+  @Post('request-email-verification')
+  @ApiOkResponse({ description: 'Sends OTP for email verification if needed' })
+  requestEmailVerification(
+    @Body() forgotPasswordDto: EmailRequestDto,
+  ): Promise<{ message: string }> {
+    return this.authService.requestEmailVerificationOtp(forgotPasswordDto.email);
+  }
+
+  @Post('verify-email-otp')
+  @ApiOkResponse({ description: 'Verify email using OTP' })
+  verifyEmailOtp(
+    @Body() verifyEmailOtpDto: VerifyEmailOtpDto,
+  ): Promise<{ message: string }> {
+    return this.authService.verifyEmailOtp(verifyEmailOtpDto);
   }
 }

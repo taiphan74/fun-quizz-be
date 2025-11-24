@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  Length,
+  IsOptional,
+  MinLength,
+} from 'class-validator';
 import { CreateUserDto, UserResponseDto } from '../users/user.dto';
 
 export class LoginDto {
@@ -62,12 +69,52 @@ export class AccessTokenResponseDto {
   accessToken: string;
 }
 
-export class ForgotPasswordDto {
+export class EmailRequestDto {
   @ApiProperty({
-    description: 'Email associated with the account that requests password reset',
+    description: 'Email associated with the account',
     example: 'user@example.com',
   })
   @IsEmail()
   @IsNotEmpty()
   email: string;
+}
+
+export class VerifyResetOtpDto {
+  @ApiProperty({
+    description: 'Email associated with the OTP',
+    example: 'user@example.com',
+  })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty({ description: 'OTP received via email', example: '123456' })
+  @IsString()
+  @IsNotEmpty()
+  @Length(6, 6)
+  otp: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ description: 'New password', example: 'newsecret123' })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(6)
+  newPassword: string;
+}
+
+export class VerifyEmailOtpDto {
+  @ApiProperty({
+    description: 'Email to verify',
+    example: 'user@example.com',
+  })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty({ description: 'OTP sent to the email', example: '123456' })
+  @IsString()
+  @IsNotEmpty()
+  @Length(6, 6)
+  otp: string;
 }
